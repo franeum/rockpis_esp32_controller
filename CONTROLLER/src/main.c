@@ -13,12 +13,12 @@
 #include "responsive.h"
 #include "serial_config.h"
 
-#define DEBUG 0
+#define DEBUG 1
 
 #define DEFAULT_VREF        1100        //Use adc2_vref_to_gpio() to obtain a better estimate
 #define NO_OF_SAMPLES       256
 #define STACK_SIZE          2048
-#define UART_PORT_NUM       0
+#define UART_PORT_NUM       1
 
 
 static esp_adc_cal_characteristics_t *adc_chars;
@@ -81,7 +81,7 @@ static void echo_task(void *arg)
     
     uint8_t data[] = { 0, 0 };
 
-    static Responsive resp = {
+    Responsive resp = {
         .analogResolution = 4096,
         .activityThreshold = 8.0,
         .edgeSnapEnable = true,
@@ -89,7 +89,7 @@ static void echo_task(void *arg)
         .sleeping = false 
     };
 
-    static SerialBytes s_data;
+    SerialBytes s_data;
 
     analog_responsive_begin(&resp, true, 0.01);
 
@@ -98,21 +98,24 @@ static void echo_task(void *arg)
         int raw;
         adc2_get_raw((adc2_channel_t)channel, width, &raw);
         analog_responsive_update(&resp, raw);
-        adc_reading = getValue(&resp);
         
-        serial_unpack_bytes(&s_data, id, adc_reading);
-        data[0] = s_data.leftmost;
-        data[1] = s_data.rightmost;
+        if (hasChanged(&resp)) {
+            adc_reading = getValue(&resp);
+            serial_unpack_bytes(&s_data, id, adc_reading);
+            data[0] = s_data.leftmost;
+            data[1] = s_data.rightmost;
 
 #if DEBUG
-        printf("id: %d\tvalue: %d\n", data[0], adc_reading);
-        printf("unpacked values: %d, %d\n", 
-            s_data.leftmost,
-            s_data.rightmost
-        );
+            printf("id: %d\tvalue: %d\tunpacked values: %d, %d\n", 
+                id,
+                adc_reading,
+                s_data.leftmost,
+                s_data.rightmost
+            );
 #else
-        uart_write_bytes(UART_PORT_NUM, (const char *) data, sizeof(data));
+            uart_write_bytes(UART_PORT_NUM, (const char *) data, sizeof(data));
 #endif
+        }
         
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
@@ -120,12 +123,24 @@ static void echo_task(void *arg)
 
 void app_main(void) {
 
+/*
     static potentiometer pot1 = {
         .id = 1,
-        .chan = ADC_CHANNEL_3
+        .chan = ADC2_CHANNEL_0
     };
+*/
+
+    adc_channel_t channels[2] = { ADC_CHANNEL_3, ADC_CHANNEL_0 };
+    static potentiometer pot[2];
 
     run_serial_config(UART_PORT_NUM);
+
     
-    xTaskCreate(echo_task, "uart_echo_task", STACK_SIZE, (void *)&pot1, 2, NULL);
+    for (int i = 0; i < 2; i++) {
+        pot[i].id = i;
+        pot[i].chan = channels[i];
+        xTaskCreate(echo_task, "uart_echo_task", STACK_SIZE, (void *)&pot[i], i+2, NULL);
+    }
+
+    //xTaskCreate(echo_task, "uart_echo_task", STACK_SIZE, (void *)&pot1, 2, NULL);
 }
