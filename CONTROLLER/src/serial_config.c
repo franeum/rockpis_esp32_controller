@@ -2,8 +2,8 @@
 #include "serial_config.h"
 
 
-#define ECHO_TEST_TXD (4)
-#define ECHO_TEST_RXD (5)
+#define ECHO_TEST_TXD (17)
+#define ECHO_TEST_RXD (16)
 #define ECHO_TEST_RTS (UART_PIN_NO_CHANGE)
 #define ECHO_TEST_CTS (UART_PIN_NO_CHANGE)
 #define ECHO_UART_BAUD_RATE     (115200)
