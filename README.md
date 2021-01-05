@@ -29,7 +29,7 @@ pin:
 
 | ESP32        | Rockpis       |
 | ------------ | ------------- |
-| 16 (TXD_PIN) | 23 (UART1_RX) |
-| 17 (RXD_PIN) | 24 (UART1_tX) |
-| BAT          | 1 (3v3)       |
+| 17 (TXD_PIN) | 23 (UART1_RX) |
+| 16 (RXD_PIN) | 24 (UART1_tX) |
+| BAT          | 1 (+3.3V)     |
 | GND          | 6 (GND)       |
