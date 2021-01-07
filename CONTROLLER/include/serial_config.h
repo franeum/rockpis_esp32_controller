@@ -6,4 +6,5 @@ typedef struct serial_bytes {
 } SerialBytes;
 
 void serial_unpack_bytes(SerialBytes * x, uint8_t id, uint32_t value);
-void run_serial_config(int number);
+void serial_init();
+int serial_send_data(const char* data);

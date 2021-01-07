@@ -1,36 +1,52 @@
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_system.h"
+#include "esp_log.h"
 #include "driver/uart.h"
+#include "string.h"
+#include "driver/gpio.h"
 #include "serial_config.h"
 
+#define TXD_PIN (GPIO_NUM_17)
+#define RXD_PIN (GPIO_NUM_16)
 
-#define ECHO_TEST_TXD (17)
-#define ECHO_TEST_RXD (16)
-#define ECHO_TEST_RTS (UART_PIN_NO_CHANGE)
-#define ECHO_TEST_CTS (UART_PIN_NO_CHANGE)
-#define ECHO_UART_BAUD_RATE     (115200)
-#define BUF_SIZE (1024)
+static const int BUF_SIZE = 1024;
 
-
-void run_serial_config(int number) {
-    uart_config_t uart_config = {
-        .baud_rate      = ECHO_UART_BAUD_RATE,
-        .data_bits      = UART_DATA_8_BITS,
-        .parity         = UART_PARITY_DISABLE,
-        .stop_bits      = UART_STOP_BITS_1,
-        .flow_ctrl      = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk     = UART_SCLK_APB,
+void serial_init(void) {
+    const uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_APB,
     };
-
-    int intr_alloc_flags = 0;
-        
-
-    #if CONFIG_UART_ISR_IN_IRAM
-        intr_alloc_flags = ESP_INTR_FLAG_IRAM;
-    #endif
-
-    ESP_ERROR_CHECK(uart_driver_install(number, BUF_SIZE * 2, 0, 0, NULL, intr_alloc_flags));
-    ESP_ERROR_CHECK(uart_param_config(number, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(number, ECHO_TEST_TXD, ECHO_TEST_RXD, ECHO_TEST_RTS, ECHO_TEST_CTS));
+    // We won't use a buffer for sending data.
+    uart_driver_install(UART_NUM_1, BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_param_config(UART_NUM_1, &uart_config);
+    uart_set_pin(UART_NUM_1, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 }
+
+
+int serial_send_data(const char* data) {
+    const int len = strlen(data);
+    const int txBytes = uart_write_bytes(UART_NUM_1, data, len);
+    //ESP_LOGI(logName, "Wrote %d bytes", txBytes);
+    return txBytes;
+}
+
+
+/*
+static void tx_task(void *arg)
+{
+    static const char *TX_TASK_TAG = "TX_TASK";
+    esp_log_level_set(TX_TASK_TAG, ESP_LOG_INFO);
+    while (1) {
+        serial_send_data(TX_TASK_TAG, "Hello world"); 
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
+    }
+}
+*/
 
 
 void serial_unpack_bytes(SerialBytes * x, uint8_t id, uint32_t value) {

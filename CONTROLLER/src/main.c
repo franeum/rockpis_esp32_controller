@@ -1,146 +1,54 @@
-// send bytes to uart esp32 -> rockpis 
-
-#include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_system.h"
+#include "esp_log.h"
 #include "driver/uart.h"
+#include "string.h"
 #include "driver/gpio.h"
-#include "sdkconfig.h"
-#include <time.h>
-#include <stdlib.h>
-#include "driver/adc.h"
-#include "esp_adc_cal.h"
-#include "responsive.h"
-#include "serial_config.h"
 
-#define DEBUG 1
+static const int RX_BUF_SIZE = 1024;
 
-#define DEFAULT_VREF        1100        //Use adc2_vref_to_gpio() to obtain a better estimate
-#define NO_OF_SAMPLES       256
-#define STACK_SIZE          2048
-#define UART_PORT_NUM       1
+#define TXD_PIN (GPIO_NUM_32)
+#define RXD_PIN (GPIO_NUM_33)
 
-
-static esp_adc_cal_characteristics_t *adc_chars;
-//static const adc_channel_t channel = ADC_CHANNEL_6;     //GPIO34 if ADC1, GPIO14 if ADC2
-static const adc_bits_width_t width = ADC_WIDTH_BIT_12;
-static const adc_atten_t atten = ADC_ATTEN_MAX; //ADC_ATTEN_DB_0;
-static const adc_unit_t unit = ADC_UNIT_2;
-
-
-typedef struct pot {
-    uint8_t         id;
-    adc_channel_t   chan;
-} potentiometer;
-
-
-static void check_efuse(void) {
-    //Check if TP is burned into eFuse
-    if (esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_TP) == ESP_OK) {
-        printf("eFuse Two Point: Supported\n");
-    } else {
-        printf("eFuse Two Point: NOT supported\n");
-    }
-    //Check Vref is burned into eFuse
-    if (esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_VREF) == ESP_OK) {
-        printf("eFuse Vref: Supported\n");
-    } else {
-        printf("eFuse Vref: NOT supported\n");
-    }
-}
-
-
-static void print_char_val_type(esp_adc_cal_value_t val_type)
-{
-    if (val_type == ESP_ADC_CAL_VAL_EFUSE_TP) {
-        printf("Characterized using Two Point Value\n");
-    } else if (val_type == ESP_ADC_CAL_VAL_EFUSE_VREF) {
-        printf("Characterized using eFuse Vref\n");
-    } else {
-        printf("Characterized using Default Vref\n");
-    }
-}
-
-
-static void echo_task(void *arg)
-{
-    potentiometer *pot = (potentiometer *)arg;
-    uint8_t id = (uint8_t)pot->id;
-    adc_channel_t channel = (adc_channel_t)pot->chan;
-
-    check_efuse();
-
-    //adc1_config_width(width);
-    adc2_config_channel_atten((adc2_channel_t)channel, atten);
-
-    
-    //Characterize ADC
-    adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
-    esp_adc_cal_value_t val_type = esp_adc_cal_characterize(unit, atten, width, DEFAULT_VREF, adc_chars);
-    print_char_val_type(val_type);
-    
-    uint8_t data[] = { 0, 0 };
-
-    Responsive resp = {
-        .analogResolution = 4096,
-        .activityThreshold = 8.0,
-        .edgeSnapEnable = true,
-        .errorEMA = 0.0,
-        .sleeping = false 
+void init(void) {
+    const uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_APB,
     };
+    // We won't use a buffer for sending data.
+    uart_driver_install(UART_NUM_2, RX_BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_param_config(UART_NUM_2, &uart_config);
+    uart_set_pin(UART_NUM_2, 17, 16, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+}
 
-    SerialBytes s_data;
 
-    analog_responsive_begin(&resp, true, 0.01);
+int sendData(const char* logName, const char* data)
+{
+    const int len = strlen(data);
+    const int txBytes = uart_write_bytes(UART_NUM_2, data, len);
+    //ESP_LOGI(logName, "Wrote %d bytes", txBytes);
+    return txBytes;
+}
 
+
+static void tx_task(void *arg)
+{
+    static const char *TX_TASK_TAG = "TX_TASK";
+    esp_log_level_set(TX_TASK_TAG, ESP_LOG_INFO);
     while (1) {
-        uint32_t adc_reading = 0;
-        int raw;
-        adc2_get_raw((adc2_channel_t)channel, width, &raw);
-        analog_responsive_update(&resp, raw);
-        
-        if (hasChanged(&resp)) {
-            adc_reading = getValue(&resp);
-            serial_unpack_bytes(&s_data, id, adc_reading);
-            data[0] = s_data.leftmost;
-            data[1] = s_data.rightmost;
-
-#if DEBUG
-            printf("id: %d\tvalue: %d\tunpacked values: %d, %d\n", 
-                id,
-                adc_reading,
-                s_data.leftmost,
-                s_data.rightmost
-            );
-#else
-            uart_write_bytes(UART_PORT_NUM, (const char *) data, sizeof(data));
-#endif
-        }
-        
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        sendData(TX_TASK_TAG, "Hello world");
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
 }
 
-void app_main(void) {
 
-/*
-    static potentiometer pot1 = {
-        .id = 1,
-        .chan = ADC2_CHANNEL_0
-    };
-*/
-
-    adc_channel_t channels[2] = { ADC_CHANNEL_3, ADC_CHANNEL_0 };
-    static potentiometer pot[2];
-
-    run_serial_config(UART_PORT_NUM);
-
-    
-    for (int i = 0; i < 2; i++) {
-        pot[i].id = i;
-        pot[i].chan = channels[i];
-        xTaskCreate(echo_task, "uart_echo_task", STACK_SIZE, (void *)&pot[i], i+2, NULL);
-    }
-
-    //xTaskCreate(echo_task, "uart_echo_task", STACK_SIZE, (void *)&pot1, 2, NULL);
+void app_main(void)
+{
+    init();
+    xTaskCreate(tx_task, "uart_tx_task", 1024*2, NULL, configMAX_PRIORITIES-1, NULL);
 }
