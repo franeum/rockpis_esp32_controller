@@ -108,13 +108,6 @@ static void echo_task(void *arg)
             data[2] = s_data.rightmost;
 
 #if DEBUG
-            /*printf("id: %d\tvalue: %d\tunpacked values: %d, %d\n", 
-                id,
-                adc_reading,
-                s_data.leftmost,
-                s_data.rightmost
-            );
-            */
             ESP_LOGI(TAG, "data: %d\t%d\n", s_data.leftmost, s_data.rightmost);
 #else
             //uart_write_bytes(UART_PORT_NUM, (const char *) data, sizeof(data));
@@ -135,8 +128,12 @@ void app_main(void) {
     };
 */
 
-    adc_channel_t channels[2] = { ADC_CHANNEL_3, ADC_CHANNEL_0 };
-    static potentiometer pot[2];
+    // pins: 34, 35, 32, 33
+    // channelss: 6,7,4,5
+    // unit: 1
+
+    adc_channel_t channels[4] = { ADC_CHANNEL_6, ADC_CHANNEL_7, ADC_CHANNEL_4, ADC_CHANNEL_5 };
+    static potentiometer pot[4];
 
     serial_init(); 
 
