@@ -8,7 +8,6 @@
 #include "serial_config.h"
 
 #define TXD_PIN (GPIO_NUM_13)
-#define RXD_PIN (GPIO_NUM_16)
 
 static const int BUF_SIZE = 1024;
 
@@ -21,8 +20,7 @@ void serial_init(void) {
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_APB,
     };
-    // We won't use a buffer for sending data.
-    //uart_driver_install(UART_NUM_2, BUF_SIZE * 2, 0, 0, NULL, 0);
+    
     uart_param_config(UART_NUM_2, &uart_config);
     uart_set_pin(UART_NUM_2, TXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     uart_driver_install(UART_NUM_2, BUF_SIZE * 2, 0, 0, NULL, 0);
@@ -35,19 +33,6 @@ int serial_send_data(const char* data) {
     //ESP_LOGI(logName, "Wrote %d bytes", txBytes);
     return txBytes;
 }
-
-
-/*
-static void tx_task(void *arg)
-{
-    static const char *TX_TASK_TAG = "TX_TASK";
-    esp_log_level_set(TX_TASK_TAG, ESP_LOG_INFO);
-    while (1) {
-        serial_send_data(TX_TASK_TAG, "Hello world"); 
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
-    }
-}
-*/
 
 
 void serial_unpack_bytes(SerialBytes * x, uint8_t id, uint32_t value) {
