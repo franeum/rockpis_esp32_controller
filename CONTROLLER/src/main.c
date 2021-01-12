@@ -27,11 +27,12 @@ static esp_adc_cal_characteristics_t *adc_chars;
 //static const adc_channel_t channel = ADC_CHANNEL_6;     //GPIO34 if ADC1, GPIO14 if ADC2
 static const adc_bits_width_t width = ADC_WIDTH_BIT_12;
 static const adc_atten_t atten = ADC_ATTEN_MAX; //ADC_ATTEN_DB_0;
-static const adc_unit_t unit = ADC_UNIT_2;
+//static const adc_unit_t unit = ADC_UNIT_2;
 
 
 typedef struct pot {
     uint8_t         id;
+    adc_unit_t      unit;
     adc_channel_t   chan;
 } potentiometer;
 
@@ -66,15 +67,22 @@ static void print_char_val_type(esp_adc_cal_value_t val_type)
 
 static void echo_task(void *arg)
 {
-    potentiometer *pot = (potentiometer *)arg;
-    uint8_t id = (uint8_t)pot->id;
-    adc_channel_t channel = (adc_channel_t)pot->chan;
+    potentiometer *pot      = (potentiometer *)arg;
+    uint8_t id              = (uint8_t)pot->id;
+    adc_channel_t channel   = (adc_channel_t)pot->chan;
+    const adc_unit_t unit   = (adc_unit_t)pot->unit;
 
     check_efuse();
 
     //adc1_config_width(width);
-    adc2_config_channel_atten((adc2_channel_t)channel, atten);
+    //adc2_config_channel_atten((adc2_channel_t)channel, atten);
 
+    if (unit == ADC_UNIT_1) {
+        adc1_config_width(width);
+        adc1_config_channel_atten((adc1_channel_t)channel, atten);
+    } else {
+        adc2_config_channel_atten((adc2_channel_t)channel, atten);
+    } 
     
     //Characterize ADC
     adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
@@ -99,7 +107,16 @@ static void echo_task(void *arg)
         uint32_t adc_reading = 0;
         int raw;
         adc2_get_raw((adc2_channel_t)channel, width, &raw);
-        analog_responsive_update(&resp, raw);
+
+        if (unit == ADC_UNIT_1) {
+            adc_reading = adc1_get_raw((adc1_channel_t)channel);
+        } else {
+            int raw;
+            adc2_get_raw((adc2_channel_t)channel, width, &raw);
+            adc_reading = raw;
+        }
+
+        analog_responsive_update(&resp, adc_reading);
         
         if (hasChanged(&resp)) {
             adc_reading = getValue(&resp);
@@ -133,16 +150,24 @@ void app_main(void) {
     // unit: 1
 
     adc_channel_t channels[4] = { ADC_CHANNEL_6, ADC_CHANNEL_7, ADC_CHANNEL_4, ADC_CHANNEL_5 };
+    const adc_unit_t unit = ADC_UNIT_1;
     static potentiometer pot[4];
 
     serial_init(); 
 
     
-    for (int i = 0; i < 1; i++) {
+    for (int i = 0; i < 4; i++) {
         pot[i].id = i;
+        pot[i].unit = unit;
         pot[i].chan = channels[i];
         xTaskCreate(echo_task, "uart_echo_task", STACK_SIZE, (void *)&pot[i], i+2, NULL);
     }
 
     //xTaskCreate(echo_task, "uart_echo_task", STACK_SIZE, (void *)&pot1, 2, NULL);
 }
+
+//salvatore tecnico smart italia 
+//3391774949
+
+//negozio smart italia - Jessica 
+//0116992920
