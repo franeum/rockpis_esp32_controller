@@ -28,9 +28,8 @@ pin:
 | ESP32        | Rockpis       |
 | ------------ | ------------- |
 | 13 (TXD_PIN) | 23 (UART1_RX) |
-| BAT          | 2 (+5V)       |
 | GND          | 6 (GND)       |
 
 
 ## TODO
-* verificare che l'ESP32 possa prendere i 5V direttamente dall'adattatore micro-USB. Il quel caso creare 2 bus: +5V e GND per alimentare sia la ROCKPIS che la ESP32
+Allo stato attuale, sembra sia preferibile che la ESP32 non sia alimentata dal pin +5V della ROCKPIS ma dai 5V del connettore micro-USB (verificare)
