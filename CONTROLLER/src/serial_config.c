@@ -28,9 +28,10 @@ void serial_init(void) {
 
 
 int serial_send_data(const char* data) {
+    //const char * mbuto = "ciao";
     const int len = strlen(data);
     const int txBytes = uart_write_bytes(UART_NUM_2, data, len);
-    //ESP_LOGI(logName, "Wrote %d bytes", txBytes);
+    //const int txBytes = uart_write_bytes(UART_NUM_2, mbuto, len);
     return txBytes;
 }
 

@@ -14,20 +14,19 @@
 #include "esp_log.h"
 #include "serial_config.h"
 
-#define DEBUG 0
+#define DEBUG               0
 
 #define DEFAULT_VREF        1100        //Use adc2_vref_to_gpio() to obtain a better estimate
 #define NO_OF_SAMPLES       256
 #define STACK_SIZE          2048
 #define UART_PORT_NUM       2
+#define NUM_OF_SAMPLES      64
 
 
 static const char* TAG = "MyESP";
 static esp_adc_cal_characteristics_t *adc_chars;
-//static const adc_channel_t channel = ADC_CHANNEL_6;     //GPIO34 if ADC1, GPIO14 if ADC2
-static const adc_bits_width_t width = ADC_WIDTH_BIT_12;
-static const adc_atten_t atten = ADC_ATTEN_MAX; //ADC_ATTEN_DB_0;
-//static const adc_unit_t unit = ADC_UNIT_2;
+static const adc_bits_width_t width                 = ADC_WIDTH_BIT_12;
+static const adc_atten_t atten                      = ADC_ATTEN_DB_11; //ADC_ATTEN_DB_0;
 
 
 typedef struct pot {
@@ -70,16 +69,15 @@ static void echo_task(void *arg)
     potentiometer *pot      = (potentiometer *)arg;
     uint8_t id              = (uint8_t)pot->id;
     adc_channel_t channel   = (adc_channel_t)pot->chan;
-    const adc_unit_t unit   = (adc_unit_t)pot->unit;
+    adc_unit_t unit         = (adc_unit_t)pot->unit;
+
+    char str[10];
 
     check_efuse();
 
-    //adc1_config_width(width);
-    //adc2_config_channel_atten((adc2_channel_t)channel, atten);
-
     if (unit == ADC_UNIT_1) {
         adc1_config_width(width);
-        adc1_config_channel_atten((adc1_channel_t)channel, atten);
+        adc1_config_channel_atten(channel, atten);
     } else {
         adc2_config_channel_atten((adc2_channel_t)channel, atten);
     } 
@@ -100,35 +98,41 @@ static void echo_task(void *arg)
     };
 
     SerialBytes s_data;
-
     analog_responsive_begin(&resp, true, 0.01);
-
+    
     while (1) {
         uint32_t adc_reading = 0;
-        int raw;
-        adc2_get_raw((adc2_channel_t)channel, width, &raw);
 
-        if (unit == ADC_UNIT_1) {
-            adc_reading = adc1_get_raw((adc1_channel_t)channel);
-        } else {
-            int raw;
-            adc2_get_raw((adc2_channel_t)channel, width, &raw);
-            adc_reading = raw;
+        for (int i = 0; i < NUM_OF_SAMPLES; i++) {
+            if (unit == ADC_UNIT_1) {
+                adc_reading += adc1_get_raw((adc1_channel_t)channel);
+            } else {
+                int raw;
+                adc2_get_raw((adc2_channel_t)channel, width, &raw);
+                adc_reading += raw;
+            }
         }
 
-        analog_responsive_update(&resp, adc_reading);
+        uint32_t clean = adc_reading / NUM_OF_SAMPLES;
+
+        analog_responsive_update(&resp, clean);
         
         if (hasChanged(&resp)) {
-            adc_reading = getValue(&resp);
-            serial_unpack_bytes(&s_data, id, adc_reading);
-            data[0] = s_data.leftmost;
-            data[2] = s_data.rightmost;
+            clean = getValue(&resp);
+            //serial_unpack_bytes(&s_data, id, clean);
+            //data[0] = s_data.leftmost;
+            //data[2] = s_data.rightmost;
+            sprintf(str, "%d %d\n", id, clean);
 
 #if DEBUG
-            ESP_LOGI(TAG, "data: %d\t%d\n", s_data.leftmost, s_data.rightmost);
+            //ESP_LOGI(TAG, "data: %d\t%d\n", s_data.leftmost, s_data.rightmost);
+            //ESP_LOGI(TAG, "%d: %d", id, clean);
+            //serial_send_data((const char *) data);
+            //sprintf(str, "%d %d\n", id, clean);
+            ESP_LOGI(TAG, "%s", str);
 #else
             //uart_write_bytes(UART_PORT_NUM, (const char *) data, sizeof(data));
-            serial_send_data((const char *) data);
+            serial_send_data((const char *)str);
 #endif
         }
         
@@ -138,19 +142,8 @@ static void echo_task(void *arg)
 
 void app_main(void) {
 
-/*
-    static potentiometer pot1 = {
-        .id = 1,
-        .chan = ADC2_CHANNEL_0
-    };
-*/
-
-    // pins: 34, 35, 32, 33
-    // channelss: 6,7,4,5
-    // unit: 1
-
-    adc_channel_t channels[4] = { ADC_CHANNEL_6, ADC_CHANNEL_7, ADC_CHANNEL_4, ADC_CHANNEL_5 };
-    const adc_unit_t unit = ADC_UNIT_1;
+    adc_channel_t channels[4] = { ADC_CHANNEL_9, ADC_CHANNEL_8, ADC_CHANNEL_5, ADC_CHANNEL_4 };
+    adc_unit_t unit[4] = { ADC_UNIT_2, ADC_UNIT_2, ADC_UNIT_1, ADC_UNIT_1,  };
     static potentiometer pot[4];
 
     serial_init(); 
@@ -158,13 +151,27 @@ void app_main(void) {
     
     for (int i = 0; i < 4; i++) {
         pot[i].id = i;
-        pot[i].unit = unit;
+        pot[i].unit = unit[i];
         pot[i].chan = channels[i];
-        xTaskCreate(echo_task, "uart_echo_task", STACK_SIZE, (void *)&pot[i], i+2, NULL);
+        xTaskCreate(echo_task, "uart_echo_task", STACK_SIZE, (void *)&pot[i], 1000+i, NULL);      
     }
 
-    //xTaskCreate(echo_task, "uart_echo_task", STACK_SIZE, (void *)&pot1, 2, NULL);
+    //xTaskCreate(echo_task, "uart_echo_task", STACK_SIZE, (void *)&pot1, 1000, NULL);
 }
+
+
+/*
+main()
+{
+  int i = 247593;
+  char str[10];
+
+  sprintf(str, "%d", i);
+  // Now str contains the integer as characters
+} 
+*/
+
+
 
 //salvatore tecnico smart italia 
 //3391774949
