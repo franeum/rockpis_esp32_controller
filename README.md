@@ -6,8 +6,7 @@ software to manage esp32 analog input and serial output to rockpis
 
 ```c
 // La variabile UART_NUM_2 rappresenta la UART 2
-#define TXD_PIN (GPIO_NUM_17) // pin di trasmissione
-#define RXD_PIN (GPIO_NUM_16) // pin di ricezione
+#define TXD_PIN (GPIO_NUM_13) // pin di trasmissione
 ```
 
 ### Configurazione ROCKPIS
@@ -22,15 +21,13 @@ pin:
 
 ```
 23 PIN DI RICEZIONE (UART1_RX)
-24 PIN DI TRASMISSIONE (UART1_tX)
 ```
 
 ### Collegamenti
 
 | ESP32        | Rockpis       |
 | ------------ | ------------- |
-| 17 (TXD_PIN) | 23 (UART1_RX) |
-| 16 (RXD_PIN) | 24 (UART1_tX) |
+| 13 (TXD_PIN) | 23 (UART1_RX) |
 | BAT          | 2 (+5V)       |
 | GND          | 6 (GND)       |
 
