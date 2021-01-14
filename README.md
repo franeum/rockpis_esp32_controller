@@ -33,3 +33,4 @@ pin:
 
 ## TODO
 Allo stato attuale, sembra sia preferibile che la ESP32 non sia alimentata dal pin +5V della ROCKPIS ma dai 5V del connettore micro-USB (verificare)
+Se la ESP32 non ha l'entrata **vin**, bisogna usare il pin di alimentazione 3.3V, quindi prendere la corrente dal micro-USB e usare un regolatore di tensione.
